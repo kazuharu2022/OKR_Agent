@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "id": "UNVERIFIED",
+  "period": {
+    "label": "UNVERIFIED",
+    "start": null,
+    "end": null
+  },
+  "status": "INCOMPLETE",
+  "context": {
+    "scope": "UNVERIFIED",
+    "strategy": "UNVERIFIED",
+    "out_of_scope": [],
+    "owner": "UNASSIGNED",
+    "decision_owner": "UNASSIGNED"
+  },
+  "objectives": [],
+  "evidence": [],
+  "assumptions": [],
+  "quality_review": {
+    "reviewer": "UNASSIGNED",
+    "reviewed_at": null,
+    "checks": {
+      "outcome_not_activity": {"result": "pending", "note": ""},
+      "necessary": {"result": "pending", "note": ""},
+      "sufficient": {"result": "pending", "note": ""},
+      "controllable": {"result": "pending", "note": ""},
+      "measurable": {"result": "pending", "note": ""},
+      "anti_gaming": {"result": "pending", "note": ""}
+    }
+  },
+  "approval": {
+    "status": "pending",
+    "approved_by": null,
+    "approved_at": null,
+    "note": ""
+  },
+  "checkins": [],
+  "closure": null,
+  "history": []
+}

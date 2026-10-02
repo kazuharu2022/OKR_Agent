@@ -1,0 +1,6 @@
+interface:
+  display_name: "OKR Cycle"
+  short_description: "対話と承認ゲートでOKRの設定から振り返りまでを支援する"
+  default_prompt: "$okr-cycle を使って、必要情報を順に確認しながらOKRを設定してください。"
+policy:
+  allow_implicit_invocation: true
