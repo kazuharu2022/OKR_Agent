@@ -5,6 +5,8 @@ resume-draft,true,setting,"okrs/2026-Q4/TEAM-2026-Q4.json の未完成OKRを再�
 review-only,true,setting,"このOKRを反証レビューして。承認や有効化はしないで"
 approve-current,true,setting,"提示された現在版を承認してACTIVEにしたい"
 weekly-checkin,true,checkin,"ACTIVEなOKRの今週の実績と阻害要因を更新したい"
+monthly-plan,true,monthly-review,"四半期KRに10月、11月、12月の月次目標を設定したい"
+monthly-review,true,monthly-review,"10月末の実績を確認して月次レビューを記録したい"
 target-change,true,checkin,"進捗が悪いのでACTIVEなKRの目標値を変更したい"
 close-cycle,true,closing,"期間終了なので最終実績を確認してOKRをCloseしたい"
 generic-theory,false,none,"OKRとSMART目標の違いを一般論として説明して"

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import calendar
 import json
 import re
 import sys
@@ -34,6 +35,8 @@ REVIEW_CHECKS = {
 }
 PLACEHOLDERS = {"", "UNVERIFIED", "UNASSIGNED", "TBD", "UNKNOWN"}
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$")
+QUARTER_PATTERN = re.compile(r"^(FY)?\d{4}-Q[1-4]$")
+MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
 @dataclass(frozen=True)
@@ -66,6 +69,20 @@ def _iso_datetime(value: Any) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo is not None else None
+
+
+def _three_month_quarter(start: date) -> tuple[date, list[str]]:
+    months: list[str] = []
+    end_year = start.year
+    end_month = start.month
+    for offset in range(3):
+        month_index = start.year * 12 + start.month - 1 + offset
+        year, zero_based_month = divmod(month_index, 12)
+        month = zero_based_month + 1
+        months.append(f"{year}-{month:02d}")
+        end_year, end_month = year, month
+    end_day = calendar.monthrange(end_year, end_month)[1]
+    return date(end_year, end_month, end_day), months
 
 
 def validate_document(document: Any) -> list[Issue]:
@@ -105,8 +122,8 @@ def validate_document(document: Any) -> list[Issue]:
     if not isinstance(document, dict):
         return [Issue("error", "ROOT_TYPE", "$", "ルートはJSONオブジェクトである必要があります")]
 
-    if document.get("schema_version") != "1.0":
-        add("error", "SCHEMA_VERSION", "$.schema_version", '対応する値は"1.0"です')
+    if document.get("schema_version") != "1.1":
+        add("error", "SCHEMA_VERSION", "$.schema_version", '対応する値は"1.1"です')
 
     status = document.get("status")
     if status not in STATUSES:
@@ -128,11 +145,23 @@ def validate_document(document: Any) -> list[Issue]:
     if not isinstance(period, dict):
         add("error", "TYPE", "$.period", "オブジェクトである必要があります")
         period = {}
-    require_text(period, "label", "$.period")
+    cadence = require_text(period, "cadence", "$.period")
+    if cadence and cadence != "quarterly":
+        add("error", "PERIOD_CADENCE", "$.period.cadence", '"quarterly"である必要があります')
+    period_label = require_text(period, "label", "$.period")
+    if period_label and QUARTER_PATTERN.fullmatch(period_label) is None:
+        add("error", "QUARTER_LABEL", "$.period.label", "2026-Q1またはFY2026-Q1の形式が必要です")
     period_start = require_date(period, "start", "$.period")
     period_end = require_date(period, "end", "$.period")
     if period_start and period_end and period_start > period_end:
         add("error", "PERIOD_ORDER", "$.period", "startはend以前である必要があります")
+    expected_months: list[str] = []
+    if period_start is not None:
+        if period_start.day != 1:
+            add("error", "QUARTER_START", "$.period.start", "四半期は月初から開始してください")
+        expected_end, expected_months = _three_month_quarter(period_start)
+        if period_end and period_end != expected_end:
+            add("error", "QUARTER_END", "$.period.end", f"3か月目の月末{expected_end.isoformat()}にしてください")
 
     context = document.get("context")
     if not isinstance(context, dict):
@@ -227,12 +256,86 @@ def validate_document(document: Any) -> list[Issue]:
                 target = {}
             if _missing(target.get("value")):
                 add("error", "REQUIRED", f"{kpath}.target.value", "目標値または完了条件が必要です")
-            require_text(target, "unit", f"{kpath}.target")
+            target_unit = require_text(target, "unit", f"{kpath}.target")
             deadline = require_date(target, "deadline", f"{kpath}.target")
             if deadline and period_start and deadline < period_start:
                 add("error", "DEADLINE_RANGE", f"{kpath}.target.deadline", "対象期間より前です")
             if deadline and period_end and deadline > period_end:
                 add("error", "DEADLINE_RANGE", f"{kpath}.target.deadline", "対象期間より後です")
+
+            monthly_milestones = kr.get("monthly_milestones")
+            if not isinstance(monthly_milestones, list):
+                add("error", "TYPE", f"{kpath}.monthly_milestones", "3か月分の配列である必要があります")
+                monthly_milestones = []
+            if len(monthly_milestones) != 3:
+                add("error", "MONTHLY_MILESTONE_COUNT", f"{kpath}.monthly_milestones", "四半期内3か月分が必要です")
+
+            milestone_months: list[str] = []
+            milestone_values: list[Any] = []
+            for mi, milestone in enumerate(monthly_milestones):
+                mpath = f"{kpath}.monthly_milestones[{mi}]"
+                if not isinstance(milestone, dict):
+                    add("error", "TYPE", mpath, "オブジェクトである必要があります")
+                    continue
+                month = require_text(milestone, "month", mpath)
+                if month:
+                    milestone_months.append(month)
+                    if MONTH_PATTERN.fullmatch(month) is None:
+                        add("error", "MONTH_FORMAT", f"{mpath}.month", "YYYY-MM形式が必要です")
+
+                milestone_target = milestone.get("target")
+                if not isinstance(milestone_target, dict):
+                    add("error", "TYPE", f"{mpath}.target", "オブジェクトである必要があります")
+                    milestone_target = {}
+                milestone_value = milestone_target.get("value")
+                if _missing(milestone_value):
+                    add("error", "REQUIRED", f"{mpath}.target.value", "月末の期待到達値または完了条件が必要です")
+                else:
+                    milestone_values.append(milestone_value)
+                milestone_unit = require_text(milestone_target, "unit", f"{mpath}.target")
+                if target_unit and milestone_unit and milestone_unit != target_unit:
+                    add("error", "MILESTONE_UNIT", f"{mpath}.target.unit", "四半期targetと同じ単位が必要です")
+                if not isinstance(milestone.get("focus_initiatives"), list):
+                    add("error", "TYPE", f"{mpath}.focus_initiatives", "配列である必要があります")
+
+                monthly_actual = milestone.get("actual")
+                if monthly_actual is not None:
+                    if not isinstance(monthly_actual, dict):
+                        add("error", "TYPE", f"{mpath}.actual", "nullまたはオブジェクトである必要があります")
+                    else:
+                        if _missing(monthly_actual.get("value")):
+                            add("error", "MONTHLY_ACTUAL", f"{mpath}.actual.value", "月次実績値が必要です")
+                        require_date(monthly_actual, "observed_at", f"{mpath}.actual")
+                        require_text(monthly_actual, "source", f"{mpath}.actual")
+
+                monthly_review = milestone.get("review")
+                if monthly_review is not None:
+                    if not isinstance(monthly_review, dict):
+                        add("error", "TYPE", f"{mpath}.review", "nullまたはオブジェクトである必要があります")
+                    else:
+                        review_status = require_text(monthly_review, "status", f"{mpath}.review")
+                        if review_status and review_status not in {"on_track", "at_risk", "off_track", "unverified"}:
+                            add("error", "MONTHLY_REVIEW_STATUS", f"{mpath}.review.status", "on_track、at_risk、off_track、unverifiedのいずれかが必要です")
+                        require_text(monthly_review, "summary", f"{mpath}.review")
+                        require_text(monthly_review, "reviewed_by", f"{mpath}.review")
+                        require_datetime(monthly_review, "reviewed_at", f"{mpath}.review")
+                        if review_status != "unverified" and not isinstance(monthly_actual, dict):
+                            add("error", "MONTHLY_ACTUAL_REQUIRED", f"{mpath}.actual", "unverified以外の月次レビューには実績が必要です")
+                elif status == "CLOSED":
+                    add("error", "MONTHLY_REVIEW_REQUIRED", f"{mpath}.review", "Close前に各月のレビューが必要です")
+
+            if expected_months and milestone_months != expected_months:
+                add("error", "MILESTONE_MONTHS", f"{kpath}.monthly_milestones", f"{', '.join(expected_months)}をこの順序で設定してください")
+            if len(milestone_values) == 3 and not _missing(target.get("value")):
+                if milestone_values[-1] != target.get("value"):
+                    add("error", "FINAL_MILESTONE_TARGET", f"{kpath}.monthly_milestones[2].target.value", "最終月は四半期targetと一致させてください")
+                if all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in milestone_values):
+                    if direction == "increase" and any(left > right for left, right in zip(milestone_values, milestone_values[1:])):
+                        add("warning", "MILESTONE_TRAJECTORY", f"{kpath}.monthly_milestones", "increaseの期待軌道が途中で低下しています")
+                    if direction == "decrease" and any(left < right for left, right in zip(milestone_values, milestone_values[1:])):
+                        add("warning", "MILESTONE_TRAJECTORY", f"{kpath}.monthly_milestones", "decreaseの期待軌道が途中で上昇しています")
+                    if direction == "maintain" and any(value != target.get("value") for value in milestone_values):
+                        add("warning", "MILESTONE_TRAJECTORY", f"{kpath}.monthly_milestones", "maintainでは各月の期待値を四半期targetと揃えることを検討してください")
 
             all_krs.append((classification or "", kr, kpath))
 

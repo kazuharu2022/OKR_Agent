@@ -19,9 +19,14 @@ SPEC.loader.exec_module(VALIDATOR)
 
 def valid_ready_document() -> dict:
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "id": "TEAM-2026-Q4",
-        "period": {"label": "2026-Q4", "start": "2026-10-01", "end": "2026-12-31"},
+        "period": {
+            "cadence": "quarterly",
+            "label": "2026-Q4",
+            "start": "2026-10-01",
+            "end": "2026-12-31",
+        },
         "status": "READY_FOR_REVIEW",
         "context": {
             "scope": "プロダクトチーム",
@@ -51,6 +56,29 @@ def valid_ready_document() -> dict:
                             "note": "",
                         },
                         "target": {"value": 70, "unit": "%", "deadline": "2026-12-31"},
+                        "monthly_milestones": [
+                            {
+                                "month": "2026-10",
+                                "target": {"value": 58, "unit": "%"},
+                                "focus_initiatives": ["導線のボトルネックを特定"],
+                                "actual": None,
+                                "review": None,
+                            },
+                            {
+                                "month": "2026-11",
+                                "target": {"value": 64, "unit": "%"},
+                                "focus_initiatives": ["改善案を段階展開"],
+                                "actual": None,
+                                "review": None,
+                            },
+                            {
+                                "month": "2026-12",
+                                "target": {"value": 70, "unit": "%"},
+                                "focus_initiatives": ["有効施策を標準化"],
+                                "actual": None,
+                                "review": None,
+                            },
+                        ],
                         "owner": "Growth Lead",
                         "data_source": "analytics/onboarding",
                         "update_cadence": "weekly",
@@ -71,6 +99,29 @@ def valid_ready_document() -> dict:
                             "note": "",
                         },
                         "target": {"value": 24, "unit": "hours", "deadline": "2026-12-31"},
+                        "monthly_milestones": [
+                            {
+                                "month": "2026-10",
+                                "target": {"value": 40, "unit": "hours"},
+                                "focus_initiatives": ["現行導線を計測"],
+                                "actual": None,
+                                "review": None,
+                            },
+                            {
+                                "month": "2026-11",
+                                "target": {"value": 32, "unit": "hours"},
+                                "focus_initiatives": ["短縮施策を検証"],
+                                "actual": None,
+                                "review": None,
+                            },
+                            {
+                                "month": "2026-12",
+                                "target": {"value": 24, "unit": "hours"},
+                                "focus_initiatives": ["有効施策を全体展開"],
+                                "actual": None,
+                                "review": None,
+                            },
+                        ],
                         "owner": "Product Lead",
                         "data_source": "analytics/time-to-value",
                         "update_cadence": "weekly",
@@ -125,6 +176,40 @@ class ValidateOkrTests(unittest.TestCase):
         codes = {issue.code for issue in self.errors(document)}
         self.assertIn("BASELINE_UNVERIFIED", codes)
 
+    def test_ready_document_requires_three_full_month_bounds(self) -> None:
+        document = valid_ready_document()
+        document["period"]["end"] = "2026-11-30"
+        codes = {issue.code for issue in self.errors(document)}
+        self.assertIn("QUARTER_END", codes)
+
+    def test_fiscal_quarter_of_three_full_months_is_supported(self) -> None:
+        document = valid_ready_document()
+        document["period"] = {
+            "cadence": "quarterly",
+            "label": "FY2026-Q1",
+            "start": "2026-04-01",
+            "end": "2026-06-30",
+        }
+        expected_months = ["2026-04", "2026-05", "2026-06"]
+        for kr in document["objectives"][0]["key_results"]:
+            kr["baseline"]["observed_at"] = "2026-03-31"
+            kr["target"]["deadline"] = "2026-06-30"
+            for milestone, month in zip(kr["monthly_milestones"], expected_months):
+                milestone["month"] = month
+        self.assertEqual([], self.errors(document))
+
+    def test_ready_document_requires_three_monthly_milestones(self) -> None:
+        document = valid_ready_document()
+        document["objectives"][0]["key_results"][0]["monthly_milestones"].pop()
+        codes = {issue.code for issue in self.errors(document)}
+        self.assertIn("MONTHLY_MILESTONE_COUNT", codes)
+
+    def test_final_monthly_milestone_must_equal_quarter_target(self) -> None:
+        document = valid_ready_document()
+        document["objectives"][0]["key_results"][0]["monthly_milestones"][2]["target"]["value"] = 69
+        codes = {issue.code for issue in self.errors(document)}
+        self.assertIn("FINAL_MILESTONE_TARGET", codes)
+
     def test_awaiting_approval_requires_all_review_checks_to_pass(self) -> None:
         document = valid_ready_document()
         document["status"] = "AWAITING_HUMAN_APPROVAL"
@@ -149,6 +234,7 @@ class ValidateOkrTests(unittest.TestCase):
         codes = {issue.code for issue in self.errors(document)}
         self.assertIn("CLOSURE_REQUIRED", codes)
         self.assertIn("ACTUAL_REQUIRED", codes)
+        self.assertIn("MONTHLY_REVIEW_REQUIRED", codes)
 
     @staticmethod
     def valid_active_document() -> dict:
@@ -188,6 +274,19 @@ class ValidateOkrTests(unittest.TestCase):
                 "source": kr["data_source"],
                 "score": 1,
             }
+            for month_index, milestone in enumerate(kr["monthly_milestones"], start=10):
+                last_day = 31 if month_index in {10, 12} else 30
+                milestone["actual"] = {
+                    "value": milestone["target"]["value"],
+                    "observed_at": f"2026-{month_index:02d}-{last_day}",
+                    "source": kr["data_source"],
+                }
+                milestone["review"] = {
+                    "status": "on_track",
+                    "summary": "月次目標に到達",
+                    "reviewed_by": kr["owner"],
+                    "reviewed_at": f"2026-{month_index:02d}-{last_day}T17:00:00+09:00",
+                }
         document["closure"] = {
             "closed_at": "2027-01-05T10:00:00+09:00",
             "approved_by": "VP Product",

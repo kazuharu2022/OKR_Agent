@@ -10,6 +10,8 @@
 
 - OKRの新規設定、レビュー、チェックイン、Closeには `.codex/skills/okr-cycle/SKILL.md` を使用する。
 - 正式な状態は `okrs/<period>/<id>.json` を正本とする。
+- OKR本体は組織の会計年度に合わせた連続3か月の四半期単位とし、各KRに四半期内3か月分の月次マイルストーンを設定する。
+- 月次目標は独立ObjectiveではなくKRの到達軌道として扱い、週次チェックインを継続する。
 - baseline、target、owner、実績、根拠、承認を推測しない。不明な値は `UNVERIFIED` または `UNASSIGNED` とする。
 - Objective、Key Result、Initiativeを混同しない。
 - 人間の明確な承認なしにOKRを `ACTIVE` にしない。ACTIVE後の目標値変更と期末Closeも承認対象とする。

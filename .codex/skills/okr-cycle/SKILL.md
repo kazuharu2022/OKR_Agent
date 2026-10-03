@@ -1,6 +1,6 @@
 ---
 name: okr-cycle
-description: Create, review, check in, or close an approval-gated OKR cycle. Use for actual OKR lifecycle work, not generic goal-setting explanations or employee evaluation.
+description: Create, review, track, or close an approval-gated quarterly OKR with monthly milestones. Use for actual OKR lifecycle work, not generic goal-setting explanations or employee evaluation.
 ---
 
 # OKR Cycle
@@ -11,11 +11,12 @@ Guide an OKR from incomplete context to evidence-backed operation without choosi
 
 1. Ask for missing information before advancing. Prefer one primary question at a time unless the user asks for a batch.
 2. Never invent baselines, targets, owners, evidence, approvals, or progress. Record unavailable facts as `UNVERIFIED` or `UNASSIGNED`.
-3. Keep Objective, Key Results, and Initiatives distinct. Objectives express the desired state, KRs provide outcome evidence, and Initiatives are proposed actions.
-4. A draft may contain unknowns, but only a validator-clean document can advance beyond `INCOMPLETE`.
-5. Do not set `ACTIVE` or materially change an active target without unambiguous human approval referencing the current proposal.
-6. Do not use OKRs as the sole basis for compensation, personnel ratings, or disciplinary decisions.
-7. Preserve evidence and decisions in the canonical JSON file. Do not silently rewrite history.
+3. Use three consecutive full months aligned to the organization's quarter as the OKR cycle. Treat monthly goals as KR milestones, not separate monthly Objectives.
+4. Keep Objective, Key Results, monthly milestones, and Initiatives distinct. Objectives express the desired state, KRs provide quarterly outcome evidence, monthly milestones show the expected trajectory, and Initiatives are proposed actions.
+5. A draft may contain unknowns, but only a validator-clean document can advance beyond `INCOMPLETE`.
+6. Do not set `ACTIVE` or materially change an active quarterly or monthly target without unambiguous human approval referencing the current proposal.
+7. Do not use OKRs as the sole basis for compensation, personnel ratings, or disciplinary decisions.
+8. Preserve evidence and decisions in the canonical JSON file. Do not silently rewrite history.
 
 ## Route
 
@@ -23,6 +24,7 @@ Read only the reference needed for the current request:
 
 - For creating, resuming, revising, or reviewing an OKR, read [references/setting.md](references/setting.md).
 - For an `ACTIVE` OKR check-in, read [references/checkin.md](references/checkin.md).
+- For planning or reviewing a calendar month, read [references/monthly-review.md](references/monthly-review.md).
 - For period-end scoring and reflection, read [references/closing.md](references/closing.md).
 
 For each new OKR set, copy [assets/okr-template.json](assets/okr-template.json) to `okrs/<period>/<id>.json`. Use one file for one scope and period. Do not edit the asset in place.
